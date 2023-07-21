@@ -1,0 +1,107 @@
+From 8ca980a0ecb5bdd76094590563b6dee7706c891b Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Bj=C3=B8rn=20Mork?= <bjorn@mork.no>
+Date: Thu, 9 Feb 2023 13:34:22 +0100
+Subject: [PATCH] mdio: add compatibility wrapper for older kernels
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Adding an inlined mdio_find_bus() hack allows this module
+to on older kernels than v5.7 without modifications or additional
+stable backports.
+
+Support the older bus_find_device() prototype for v5.4 and older.
+
+Anything older than v5.2 cannot be supported without majore changes
+to the generic netlink policy validation framework.
+
+Signed-off-by: Bjørn Mork <bjorn@mork.no>
+---
+ README.md             |  2 +-
+ kernel/compat.h       | 51 +++++++++++++++++++++++++++++++++++++++++++
+ kernel/mdio-netlink.c |  1 +
+ 3 files changed, 53 insertions(+), 1 deletion(-)
+ create mode 100644 kernel/compat.h
+
+diff --git a/README.md b/README.md
+index 657fdb6..5236002 100644
+--- a/README.md
++++ b/README.md
+@@ -90,7 +90,7 @@ Operations:
+ Build
+ -----
+ 
+-At the moment, the kernel module (which requires at least kernel version 5.6)
++At the moment, the kernel module (which requires at least kernel version 5.2)
+ has to be built separately. Set `KDIR` if building against a kernel in a
+ non-standard location.
+ 
+diff --git a/kernel/compat.h b/kernel/compat.h
+new file mode 100644
+index 0000000..87ad5c1
+--- /dev/null
++++ b/kernel/compat.h
+@@ -0,0 +1,51 @@
++// SPDX-License-Identifier: GPL-2.0
++
++#ifndef _COMPAT_H_
++#define _COMPAT_H_
++
++#include <linux/version.h>
++
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5,7,0)
++#include <linux/device.h>
++#include <linux/phy.h>
++
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5,4,0)
++#include <linux/string.h>
++
++static inline int _mdio_find_bus_match(struct device *dev, void *data)
++{
++	return dev->parent && sysfs_streq(dev_name(dev->parent), data);
++}
++#else
++static inline int _mdio_find_bus_match(struct device *dev, const void *data)
++{
++	return dev->parent && device_match_name(dev->parent, data);
++}
++#endif
++
++/**
++ * mdio_find_bus - Given the name of a mdiobus, find the mii_bus.
++ * @mdio_bus_np: Pointer to the mii_bus.
++ *
++ * Returns a reference to the mii_bus, or NULL if none found.  The
++ * embedded struct device will have its reference count incremented,
++ * and this must be put_deviced'ed once the bus is finished with.
++ *
++ * Abuse bus_find_device() to * reimplement the mdio_find_bus()
++ * function introduced in v5.7.
++ */
++static inline struct mii_bus *mdio_find_bus(const char *mdio_name)
++{
++	struct device *d, *p = NULL;
++
++	d = bus_find_device(&mdio_bus_type, NULL, (char *)mdio_name, _mdio_find_bus_match);
++	if (!d)
++		return NULL;
++	if (d->parent)
++		p = get_device(d->parent);
++	put_device(d);
++	return p ? to_mii_bus(p) : NULL;
++}
++#endif
++
++#endif /* _COMPAT_H_ */
+diff --git a/kernel/mdio-netlink.c b/kernel/mdio-netlink.c
+index fb8254e..56148fa 100644
+--- a/kernel/mdio-netlink.c
++++ b/kernel/mdio-netlink.c
+@@ -8,6 +8,7 @@
+ #include <linux/phy.h>
+ #include <net/genetlink.h>
+ #include <net/netlink.h>
++#include "compat.h"
+ 
+ struct mdio_nl_xfer {
+ 	struct genl_info *info;

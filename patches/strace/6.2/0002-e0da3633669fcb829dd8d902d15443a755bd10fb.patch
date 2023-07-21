@@ -1,0 +1,102 @@
+From e0da3633669fcb829dd8d902d15443a755bd10fb Mon Sep 17 00:00:00 2001
+From: "Dmitry V. Levin" <ldv@strace.io>
+Date: Mon, 3 Jul 2023 08:00:00 +0000
+Subject: [PATCH] io_uring: rename resv2 fields of io_[cs]qring_offsets to
+ user_addr
+
+* bundled/linux/include/uapi/linux/io_uring.h (struct io_sqring_offsets,
+struct io_cqring_offsets): Rename resv2 to user_addr following
+the change introduced by Linux kernel commit v6.5-rc1~235^2~32.
+* src/io_uring.c (print_io_sqring_offsets, print_io_cqring_offsets):
+Likewise.
+* tests/io_uring_setup.c (main): Update expected output.
+---
+ bundled/linux/include/uapi/linux/io_uring.h |  4 ++--
+ src/io_uring.c                              | 12 ++++--------
+ tests/io_uring_setup.c                      | 14 ++++++--------
+ 3 files changed, 12 insertions(+), 18 deletions(-)
+
+diff --git a/bundled/linux/include/uapi/linux/io_uring.h b/bundled/linux/include/uapi/linux/io_uring.h
+index 84c33b5e84..ee70e863bd 100644
+--- a/bundled/linux/include/uapi/linux/io_uring.h
++++ b/bundled/linux/include/uapi/linux/io_uring.h
+@@ -406,7 +406,7 @@ struct io_sqring_offsets {
+ 	__u32 dropped;
+ 	__u32 array;
+ 	__u32 resv1;
+-	__u64 resv2;
++	__u64 user_addr;
+ };
+ 
+ /*
+@@ -425,7 +425,7 @@ struct io_cqring_offsets {
+ 	__u32 cqes;
+ 	__u32 flags;
+ 	__u32 resv1;
+-	__u64 resv2;
++	__u64 user_addr;
+ };
+ 
+ /*
+diff --git a/src/io_uring.c b/src/io_uring.c
+index 61e9357f7d..6c17a0918d 100644
+--- a/src/io_uring.c
++++ b/src/io_uring.c
+@@ -45,10 +45,8 @@ print_io_sqring_offsets(const struct io_sqring_offsets *const p)
+ 		tprint_struct_next();
+ 		PRINT_FIELD_X(*p, resv1);
+ 	}
+-	if (p->resv2) {
+-		tprint_struct_next();
+-		PRINT_FIELD_X(*p, resv2);
+-	}
++	tprint_struct_next();
++	PRINT_FIELD_X(*p, user_addr);
+ 	tprint_struct_end();
+ }
+ 
+@@ -73,10 +71,8 @@ print_io_cqring_offsets(const struct io_cqring_offsets *const p)
+ 		tprint_struct_next();
+ 		PRINT_FIELD_X(*p, resv1);
+ 	}
+-	if (p->resv2) {
+-		tprint_struct_next();
+-		PRINT_FIELD_X(*p, resv2);
+-	}
++	tprint_struct_next();
++	PRINT_FIELD_X(*p, user_addr);
+ 	tprint_struct_end();
+ }
+ 
+diff --git a/tests/io_uring_setup.c b/tests/io_uring_setup.c
+index db667852fe..da174b5886 100644
+--- a/tests/io_uring_setup.c
++++ b/tests/io_uring_setup.c
+@@ -113,10 +113,9 @@ main(void)
+ 			       params->sq_off.array);
+ 			if (params->sq_off.resv1)
+ 				printf(", resv1=%#x", params->sq_off.resv1);
+-			if (params->sq_off.resv2)
+-				printf(", resv1=%#llx",
+-				       (unsigned long long)
+-						params->sq_off.resv2);
++			printf(", user_addr=%#llx",
++			       (unsigned long long)
++					params->sq_off.user_addr);
+ 
+ 			printf("}, cq_off={head=%u, tail=%u, ring_mask=%u"
+ 			       ", ring_entries=%u, overflow=%u, cqes=%u"
+@@ -130,10 +129,9 @@ main(void)
+ 			       params->cq_off.flags);
+ 			if (params->cq_off.resv1)
+ 				printf(", resv1=%#x", params->cq_off.resv1);
+-			if (params->cq_off.resv2)
+-				printf(", resv2=%#llx",
+-				       (unsigned long long)
+-						params->cq_off.resv2);
++			printf(", user_addr=%#llx",
++			       (unsigned long long)
++					params->cq_off.user_addr);
+ 
+ 			printf("}}) = %ld<anon_inode:[io_uring]>\n", rc);
+ 		}
