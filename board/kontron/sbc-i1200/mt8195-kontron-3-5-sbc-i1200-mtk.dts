@@ -1273,6 +1273,37 @@
 
 /* additional changes for mtk kernel */
 #if !defined(IS_UPSTREAM)
+&{/reserved-memory} {
+	snd_dma_mem_reserved: snd_dma_mem_region {
+		compatible = "shared-dma-pool";
+		reg = <0 0x60000000 0 0x1100000>;
+		no-map;
+	};
+
+	apu_reserve_memory: apu-reserve-memory {
+		compatible = "shared-dma-pool";
+		size = <0 0x1400000>; //20 MB
+		alignment = <0 0x10000>;
+		reg = <0 0x62000000 0 0x1400000>;
+
+	};
+
+	vpu_reserve_memory: vpu-reserve-memory {
+		compatible = "shared-dma-pool";
+		size = <0 0x1400000>; //20 MB
+		alignment = <0 0x10000>;
+		reg = <0 0x53000000 0 0x1400000>;
+	};
+};
+
+&afe {
+	#sound-dai-cells = <0>;
+	memory-region = <&snd_dma_mem_reserved>;
+	mediatek,etdm-out1-multi-pin-mode = <1>;
+	mediatek,dmic-iir-on;
+	status = "okay";
+};
+
 &disp_dpi1 {
 	mediatek,indicated-display-path = <1>;
 	status = "okay";
@@ -1295,6 +1326,21 @@
 /* The 5v pin is wired to the DP0 pwr-en pin */
 &hdmi_pins {
 	/delete-node/ pins-5vctrl;
+};
+
+&pio {
+	aud_pins_default: audiodefault {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO70__FUNC_AUD_SYNC_MOSI>,
+				 <PINMUX_GPIO69__FUNC_AUD_CLK_MOSI>,
+				 <PINMUX_GPIO71__FUNC_AUD_DAT_MOSI0>,
+				 <PINMUX_GPIO72__FUNC_AUD_DAT_MOSI1>,
+				 <PINMUX_GPIO73__FUNC_AUD_DAT_MISO0>,
+				 <PINMUX_GPIO74__FUNC_AUD_DAT_MISO1>,
+				 <PINMUX_GPIO75__FUNC_AUD_DAT_MISO2>;
+		};
+	};
+
 };
 
 &{/soc} {
@@ -1448,6 +1494,54 @@
 			opp-hz-real = /bits/ 64 <880000000>,
 				      /bits/ 64 <880000000>;
 			opp-microvolt = <750000>, <750000>;
+		};
+	};
+};
+
+&sound {
+	compatible = "mediatek,mt8395-evk";
+	model = "mt8195_demo";
+	pinctrl-names = "default";
+	pinctrl-0 = <&aud_pins_default>;
+	status = "okay";
+
+	dai-link-0 {
+		sound-dai = <&afe>;
+		dai-link-name = "DL_SRC_BE";
+
+		codec-0 {
+			sound-dai = <&pmic 0>;
+		};
+	};
+
+	dai-link-1 {
+		sound-dai = <&afe>;
+		dai-link-name = "UL_SRC1_BE";
+
+		codec-0 {
+			sound-dai = <&pmic 0>;
+		};
+
+		codec-1 {
+			sound-dai = <&dmic_codec>;
+		};
+	};
+
+	dai-link-2 {
+		sound-dai = <&afe>;
+		dai-link-name = "UL_SRC2_BE";
+
+		codec-0 {
+			sound-dai = <&pmic 1>;
+		};
+	};
+
+	dai-link-3 {
+		sound-dai = <&afe>;
+		dai-link-name = "ETDM3_OUT_BE";
+
+		codec-0 {
+			sound-dai = <&hdmi0>;
 		};
 	};
 };
