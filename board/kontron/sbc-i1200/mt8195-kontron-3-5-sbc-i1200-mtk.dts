@@ -1273,6 +1273,15 @@
 
 /* additional changes for mtk kernel */
 #if !defined(IS_UPSTREAM)
+&{/} {
+	amic_codec: amic-codec {
+		#sound-dai-cells = <0>;
+		compatible = "dmic-codec";
+		num-channels = <2>;
+		wakeup-delay-ms = <200>;
+	};
+};
+
 &{/reserved-memory} {
 	snd_dma_mem_reserved: snd_dma_mem_region {
 		compatible = "shared-dma-pool";
@@ -1523,7 +1532,7 @@
 		};
 
 		codec-1 {
-			sound-dai = <&dmic_codec>;
+			sound-dai = <&amic_codec>;
 		};
 	};
 
